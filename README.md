@@ -1,50 +1,6 @@
 <div align="center">
 
-<!-- Animated Title SVG -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 160" width="900" height="160">
-  <defs>
-    <linearGradient id="titleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#00D2D3">
-        <animate attributeName="stop-color" values="#00D2D3;#2C73D2;#7B2FBE;#00D2D3" dur="4s" repeatCount="indefinite"/>
-      </stop>
-      <stop offset="50%" style="stop-color:#2C73D2">
-        <animate attributeName="stop-color" values="#2C73D2;#7B2FBE;#00D2D3;#2C73D2" dur="4s" repeatCount="indefinite"/>
-      </stop>
-      <stop offset="100%" style="stop-color:#7B2FBE">
-        <animate attributeName="stop-color" values="#7B2FBE;#00D2D3;#2C73D2;#7B2FBE" dur="4s" repeatCount="indefinite"/>
-      </stop>
-    </linearGradient>
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0A0F1E"/>
-      <stop offset="100%" style="stop-color:#0D1635"/>
-    </linearGradient>
-  </defs>
-  <rect width="900" height="160" rx="16" fill="url(#bgGrad)"/>
-  <rect width="900" height="160" rx="16" fill="none" stroke="url(#titleGrad)" stroke-width="1.5">
-    <animate attributeName="opacity" values="0.4;0.9;0.4" dur="3s" repeatCount="indefinite"/>
-  </rect>
-  <g transform="translate(50,25)">
-    <path d="M45 5 L85 20 L85 60 C85 82 65 95 45 100 C25 95 5 82 5 60 L5 20 Z" fill="none" stroke="url(#titleGrad)" stroke-width="2.5" filter="url(#glow)"/>
-    <path d="M30 52 L42 64 L62 44" fill="none" stroke="#00D2D3" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
-  </g>
-  <text x="160" y="78" font-family="'Segoe UI',Arial,sans-serif" font-size="58" font-weight="700" fill="url(#titleGrad)" filter="url(#glow)" letter-spacing="-1">MedVault</text>
-  <text x="162" y="110" font-family="'Segoe UI',Arial,sans-serif" font-size="16" fill="#8892A4" letter-spacing="3">HEALTHCARE DOCUMENT PRIVACY PIPELINE</text>
-  <rect x="162" y="124" width="60" height="22" rx="11" fill="#00D2D3" opacity="0.15"/>
-  <text x="192" y="139" font-family="'Segoe UI',Arial,sans-serif" font-size="12" fill="#00D2D3" text-anchor="middle" font-weight="600">v2.0.0</text>
-  <circle cx="820" cy="80" r="4" fill="#00D2D3">
-    <animate attributeName="r" values="4;7;4" dur="2s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="845" cy="80" r="4" fill="#2C73D2">
-    <animate attributeName="r" values="4;7;4" dur="2s" begin="0.5s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="870" cy="80" r="4" fill="#7B2FBE">
-    <animate attributeName="r" values="4;7;4" dur="2s" begin="1s" repeatCount="indefinite"/>
-  </circle>
-</svg>
+![MedVault — Healthcare Document Privacy Pipeline](docs/title_banner.png)
 
 <br/>
 
@@ -61,20 +17,6 @@
   <img src="https://img.shields.io/badge/Status-Production_Ready-22C55E?style=for-the-badge" alt="Status"/>
   <img src="https://img.shields.io/badge/PHI_Detection-Presidio_+_scispaCy-7B2FBE?style=for-the-badge" alt="Presidio"/>
 </p>
-
-<svg xmlns="http://www.w3.org/2000/svg" width="700" height="4">
-  <defs>
-    <linearGradient id="scanGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:transparent"/>
-      <stop offset="30%" style="stop-color:#00D2D3"/>
-      <stop offset="70%" style="stop-color:#2C73D2"/>
-      <stop offset="100%" style="stop-color:transparent"/>
-    </linearGradient>
-  </defs>
-  <rect width="700" height="4" rx="2" fill="url(#scanGrad)">
-    <animate attributeName="opacity" values="0.3;1;0.3" dur="2s" repeatCount="indefinite"/>
-  </rect>
-</svg>
 
 </div>
 
@@ -184,43 +126,13 @@ Key design principles:
 
 ### System Layers
 
-```
-FRONTEND  (React 19 + TanStack)
-  TanStack Router file-based routing
-  TanStack Query server state management
-  Radix UI + Tailwind CSS v4
-  Recharts analytics  •  Motion animations
+<div align="center">
 
-         ↕  REST API  /api/v1/*  •  JWT Bearer tokens
+![MedVault System Layers](docs/system_layers_diagram.png)
 
-BACKEND  (FastAPI 0.139 · Python 3.12)
-  Modules: auth · documents · redaction · batch
-           review · sharing · audit · intelligence
-           qa · risk · synthetic · storage
+*Three-tier architecture — React frontend · FastAPI backend with detection & redaction engine · MongoDB Atlas + ephemeral storage*
 
-  DETECTION PIPELINE
-    [1] Presidio built-in recognizers
-    [2] scispaCy medical NER (en_ner_bc5cdr_md)
-    [3] Custom healthcare regex + checksum validation
-    [4] Context boost (label proximity scoring)
-        ↓  Confidence scoring formula  ↓
-        Mistral AI ambiguity resolver
-
-  REDACTION ENGINE
-    PyMuPDF (PDF)  •  python-docx (DOCX)
-    openpyxl (XLSX)  •  Pillow + OpenCV (Images)
-    pydicom (DICOM)  •  email module (EML/MBOX)
-
-  QA LOOP: Re-OCR + Re-detect on output
-  AUDIT:   SHA-256 hash-chain, append-only
-  BATCH:   AsyncIO worker, per-file isolation
-
-         ↕                    ↕
-
-MongoDB Atlas (M0)      Ephemeral Temp Store
-Metadata only           /tmp/medvault_jobs/{id}/
-No raw PHI stored       TTL: 1 hour → auto-deleted
-```
+</div>
 
 ### Key Architectural Decisions
 
@@ -295,42 +207,13 @@ MedVault provides **5 purpose-built privacy modes**, selectable per-job without 
 
 ### The 4-Layer Ensemble
 
-```
-Text Input
-    |
-    |--- [1] Presidio Built-in Recognizers
-    |         SSN, Email, Phone, Credit Card
-    |         IP, URL, Date, Person, Location (spaCy en_core_web_lg)
-    |
-    |--- [2] scispaCy Medical NER
-    |         Diagnoses, Medications, Conditions
-    |         en_core_sci_md + en_ner_bc5cdr_md
-    |         HIPAA Safe Harbor identifier #18 catch-all
-    |
-    |--- [3] Custom Healthcare Regex Recognizers
-    |         MRN patterns (facility-specific formats)
-    |         NPI (Luhn-style checksum validation, not just shape)
-    |         DEA numbers (structure + checksum)
-    |         Insurance and policy number patterns
-    |
-    |--- [4] Context / Structural Boost
-              Excel: column header "Patient Name" boosts all cells below
-              PDF/DOCX: inline labels "DOB:", "MRN#:", "Patient:"
-              Section headers boost ambiguous spans in that section
+<div align="center">
 
-              Merge + deduplicate by span offset
+![PHI Detection — 4-Layer Ensemble](docs/phi_detection_layers.png)
 
-         Confidence Scoring Formula:
-         0.45 * detector_score
-       + 0.25 * pattern_validation (regex + checksum pass/fail)
-       + 0.20 * context_boost (label proximity)
-       + 0.10 * mistral_agent_score (mid-confidence spans only)
-       = final confidence [0.0 to 1.0]
+*Four detection layers run in parallel, results merged by span offset, then scored through the confidence formula and routed accordingly*
 
-       >= 0.75  -->  Auto-redact
-       0.40-0.75 --> Mistral ambiguity resolution
-       < 0.40   -->  Log as "reviewed, not redacted"
-```
+</div>
 
 ### Document-Level Entity Cache
 
@@ -694,55 +577,7 @@ SYSTEM
 
 <div align="center">
 
-<!-- Animated Impact Line -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 100" width="900" height="100">
-  <defs>
-    <linearGradient id="impactBg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#050A14"/>
-      <stop offset="100%" style="stop-color:#0A1628"/>
-    </linearGradient>
-    <linearGradient id="impactGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#00D2D3">
-        <animate attributeName="stop-color" values="#00D2D3;#2C73D2;#7B2FBE;#00D2D3" dur="5s" repeatCount="indefinite"/>
-      </stop>
-      <stop offset="50%" style="stop-color:#2C73D2">
-        <animate attributeName="stop-color" values="#2C73D2;#7B2FBE;#00D2D3;#2C73D2" dur="5s" repeatCount="indefinite"/>
-      </stop>
-      <stop offset="100%" style="stop-color:#7B2FBE">
-        <animate attributeName="stop-color" values="#7B2FBE;#00D2D3;#2C73D2;#7B2FBE" dur="5s" repeatCount="indefinite"/>
-      </stop>
-    </linearGradient>
-    <filter id="glow2">
-      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-  </defs>
-  <rect width="900" height="100" rx="12" fill="url(#impactBg)"/>
-  <rect x="0" y="0" width="900" height="100" rx="12" fill="none" stroke="url(#impactGrad)" stroke-width="1.5">
-    <animate attributeName="opacity" values="0.3;0.9;0.3" dur="3s" repeatCount="indefinite"/>
-  </rect>
-  <rect x="0" y="0" width="900" height="2.5" rx="1.25" fill="url(#impactGrad)" filter="url(#glow2)">
-    <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite"/>
-  </rect>
-  <rect x="0" y="97.5" width="900" height="2.5" rx="1.25" fill="url(#impactGrad)" filter="url(#glow2)">
-    <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" begin="1s" repeatCount="indefinite"/>
-  </rect>
-  <circle cx="28" cy="50" r="3" fill="#00D2D3" filter="url(#glow2)">
-    <animate attributeName="opacity" values="0.4;1;0.4" dur="2s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="46" cy="50" r="3" fill="#2C73D2" filter="url(#glow2)">
-    <animate attributeName="opacity" values="0.4;1;0.4" dur="2s" begin="0.4s" repeatCount="indefinite"/>
-  </circle>
-  <text x="450" y="43" font-family="Georgia,'Times New Roman',serif" font-size="16" fill="url(#impactGrad)" text-anchor="middle" font-style="italic" filter="url(#glow2)">"Privacy is not a barrier to progress.</text>
-  <text x="450" y="66" font-family="Georgia,'Times New Roman',serif" font-size="16" fill="url(#impactGrad)" text-anchor="middle" font-style="italic" filter="url(#glow2)">It is the foundation of trust in healthcare."</text>
-  <text x="450" y="85" font-family="'Segoe UI',Arial,sans-serif" font-size="10" fill="#4A5568" text-anchor="middle" letter-spacing="3">— MedVault</text>
-  <circle cx="854" cy="50" r="3" fill="#7B2FBE" filter="url(#glow2)">
-    <animate attributeName="opacity" values="0.4;1;0.4" dur="2s" begin="0.8s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="872" cy="50" r="3" fill="#2C73D2" filter="url(#glow2)">
-    <animate attributeName="opacity" values="0.4;1;0.4" dur="2s" begin="1.2s" repeatCount="indefinite"/>
-  </circle>
-</svg>
+![MedVault — Privacy is not a barrier to progress](docs/impact_line.png)
 
 </div>
 

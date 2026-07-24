@@ -1,6 +1,11 @@
 <div align="center">
 
+<!-- Native-size banner retained in source but hidden to keep README rendering compact. -->
+<!--
 ![MedVault — Healthcare Document Privacy Pipeline](docs/title_banner.png)
+
+-->
+<img src="docs/title_banner.png" alt="MedVault healthcare document privacy pipeline" width="860" />
 
 <br/>
 
@@ -577,7 +582,12 @@ SYSTEM
 
 <div align="center">
 
+<!-- Native-size impact graphic retained in source but hidden to keep README rendering compact. -->
+<!--
 ![MedVault — Privacy is not a barrier to progress](docs/impact_line.png)
+
+-->
+<img src="docs/impact_line.png" alt="Privacy is not a barrier to progress" width="860" />
 
 </div>
 

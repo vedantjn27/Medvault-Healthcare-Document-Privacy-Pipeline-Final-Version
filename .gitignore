@@ -1,0 +1,35 @@
+# Secrets
+.env
+backend/.env
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# MedVault ephemeral files
+backend/.medvault_jobs/
+.medvault_jobs/
+backend/benchmark_results.json
+backend/sample_validation_results.json
+
+# Frontend build and tool caches
+frontend/.output/
+frontend/.tanstack/
+frontend/node_modules/.vite/
+frontend/node_modules/.nitro/
+
+# Local testing material and runtime logs
+TEST_CREDENTIALS.txt
+*.log
+logs/
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

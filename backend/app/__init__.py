@@ -1,0 +1,1 @@
+"""MedVault backend application package."""

@@ -1,0 +1,1 @@
+"""Authentication and notification package."""

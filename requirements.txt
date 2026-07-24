@@ -1,0 +1,3 @@
+# Root convenience entry point for MedVault's Python backend dependencies.
+# Install with: python -m pip install -r requirements.txt
+-r backend/requirements.txt

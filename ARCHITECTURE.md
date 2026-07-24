@@ -187,33 +187,33 @@ flowchart TB
 ## Data Flow — Single Document
 
 ```mermaid
-sequenceDiagram
-    autonumber
-    participant U as User browser
-    participant A as FastAPI
-    participant T as Ephemeral storage
-    participant P as Processing pipeline
-    participant M as MongoDB metadata
-    U->>A: Upload file
-    A->>T: Create isolated per-job directory
-    A-->>U: Return document ID
-    U->>A: Start redaction with selected mode
-    A-->>U: Return job ID
-    A->>P: Queue processing
-    P->>T: Extract content and create working output
-    P->>P: Detect, score, resolve and redact
-    P->>P: Re-OCR and re-scan QA
-    P->>T: Write redacted artifact, heatmap and report
-    P->>M: Save safe metadata and hash-chain audit entry
-    loop While processing
-        U->>A: Poll job status
-        A-->>U: Queued or processing
-    end
-    U->>A: Read completed job
-    A-->>U: Preview metadata and completed status
-    U->>A: Download verified output
-    A->>T: Read output; retain for active session/TTL
-    A-->>U: Original file type with correct content disposition
+flowchart TB
+    Upload[User uploads a document] --> Create[FastAPI creates an isolated job directory]
+    Create --> DocumentId[Return document ID]
+    DocumentId --> Start[User starts redaction with a selected mode]
+    Start --> JobId[Return job ID and queue processing]
+    JobId --> Extract[Extract text, images and page coordinates]
+    Extract --> Detect[Detect PHI, score confidence and resolve ambiguity]
+    Detect --> Redact[Apply mode-specific destructive redaction]
+    Redact --> QA[Re-OCR and re-scan output]
+    QA --> Pass{QA passes?}
+    Pass -->|No| Failed[Record QA failure and block download]
+    Pass -->|Yes| Artifacts[Generate redacted file, heatmap and PDF report]
+    Artifacts --> Audit[Write safe metadata and hash-chain audit entry]
+    Audit --> Ready[Completed job available for authenticated preview]
+    Ready --> Download[Download with original file extension]
+    Download --> Retain[Retain only for active session or TTL]
+
+    classDef user fill:#123e54,stroke:#49dbd3,color:#fff;
+    classDef process fill:#272255,stroke:#a68cff,color:#fff;
+    classDef decision fill:#513911,stroke:#ffd068,color:#fff;
+    classDef success fill:#153e2d,stroke:#59df9e,color:#fff;
+    classDef failure fill:#4b202a,stroke:#ff8190,color:#fff;
+    class Upload,DocumentId,Start,JobId user;
+    class Create,Extract,Detect,Redact,QA,Artifacts,Audit process;
+    class Pass decision;
+    class Ready,Download,Retain success;
+    class Failed failure;
 ```
 
 ---
@@ -226,11 +226,11 @@ flowchart LR
     subgraph Vercel[Vercel]
         CDN[React static application\nCDN delivery]
     end
-    CDN -->|HTTPS REST| Render
+    CDN -->|HTTPS REST| API
     subgraph Render[Render web service]
         API[FastAPI + Uvicorn\nPython 3.12]
         Sys[Tesseract · Poppler\nzbar · OpenCV system tools]
-        Temp[/tmp/medvault_jobs\nephemeral working storage]
+        Temp[Temporary job storage\n/tmp/medvault_jobs]
         API --- Sys
         API --> Temp
     end
@@ -241,8 +241,8 @@ flowchart LR
     classDef cloud fill:#18385a,stroke:#65b7ff,color:#fff;
     classDef compute fill:#2b2456,stroke:#b195ff,color:#fff;
     classDef storage fill:#163c2d,stroke:#59d997,color:#fff;
-    class CDN,Vercel cloud;
-    class API,Sys,Render compute;
+    class CDN cloud;
+    class API,Sys compute;
     class Temp,Atlas,SMTP,Push storage;
 ```
 

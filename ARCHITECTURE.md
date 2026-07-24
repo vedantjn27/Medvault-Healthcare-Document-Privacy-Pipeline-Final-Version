@@ -8,269 +8,254 @@
 
 MedVault is designed around three non-negotiable principles:
 
-1. **No PHI at rest** — Raw document files exist only in ephemeral temp directories during active job processing (maximum 1-hour TTL). MongoDB stores only metadata: entity types, locations, confidence scores, and audit hashes — never the text content of any PHI.
-
-2. **Destructive redaction** — PHI is physically removed from output files using PyMuPDF's `apply_redactions()` (for PDFs), pixel overwrite (for images), and run-level text replacement (for DOCX/XLSX). There is no recoverable overlay.
-
-3. **Self-verifying outputs** — Every redacted file is re-OCR'd and re-scanned by the full detection stack before export is permitted. A QA failure status blocks the download endpoint until the issue is resolved.
+1. **No PHI at rest** — Raw document files exist only in isolated temporary directories during active processing. MongoDB stores metadata, entity types, locations, confidence scores, and audit hashes — never the text content of PHI.
+2. **Destructive redaction** — Redacted content is physically removed: PDF redactions are applied with PyMuPDF, images use pixel overwrite, and Office files use run/cell-level replacement. There is no recoverable overlay.
+3. **Self-verifying outputs** — Each redacted file is re-scanned before export. A failed QA result blocks download until it is resolved.
 
 ---
 
 ## System Boundary Diagram
 
+```mermaid
+flowchart TB
+    User([Clinical user]) --> Browser
+    subgraph Browser[Browser — React 19 SPA]
+        direction LR
+        UI[Landing, auth, dashboard, upload]
+        Views[Jobs, batch, comparison, audit, review, intelligence]
+        UI --- Views
+    end
+    Browser -->|HTTPS REST · JWT bearer| API
+
+    subgraph API[FastAPI application]
+        direction TB
+        Routes[Auth · documents · redaction · batch · sharing]
+        Services[Audit · human review · privacy intelligence]
+        Workers[Background jobs and TTL cleanup]
+        Pipeline[Detection, redaction, QA and report pipeline]
+        Routes --> Pipeline
+        Services --> Pipeline
+        Workers --> Pipeline
+    end
+
+    API --> Metadata[(MongoDB Atlas\nmetadata + audit hashes only)]
+    Pipeline --> Temp[/Ephemeral per-job storage\noriginal + redacted working files/]
+    API -. optional .-> Mail[SMTP secure-share notification]
+    API -. optional .-> Push[VAPID browser push]
+
+    classDef client fill:#0b2f4a,stroke:#31d5ca,color:#fff;
+    classDef service fill:#10213c,stroke:#5b9cff,color:#fff;
+    classDef store fill:#16372d,stroke:#51d38a,color:#fff;
+    class Browser,UI,Views client;
+    class API,Routes,Services,Workers,Pipeline service;
+    class Metadata,Temp,Mail,Push store;
 ```
-┌────────────────────────────────────────────────────────────────────────────────┐
-│                              BROWSER (User)                                    │
-│                                                                                │
-│   React 19 SPA                                                                 │
-│   TanStack Router · TanStack Query · Radix UI · Tailwind CSS v4                │
-│   Motion animations · Recharts · Lucide icons                                  │
-│                                                                                │
-│   Pages: Landing · Auth · Dashboard · Upload · Job Detail · Batch             │
-│           Compare Modes · Audit · Settings · Contact · Secure Share            │
-└────────────────────────────────────┬───────────────────────────────────────────┘
-                                     │
-                              HTTPS / REST
-                              JWT Bearer token
-                              /api/v1/* prefix
-                                     │
-┌────────────────────────────────────▼───────────────────────────────────────────┐
-│                         FastAPI Application (Python 3.12)                       │
-│                           Deployed on Render                                    │
-│                                                                                │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐    │
-│  │   auth   │  │documents │  │redaction │  │  batch   │  │   sharing    │    │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘  └──────────────┘    │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────────────────────────┐    │
-│  │  audit   │  │  review  │  │intelli-  │  │       Background Workers   │    │
-│  │  trail   │  │  queue   │  │  gence   │  │  temp-cleanup · batch-job  │    │
-│  └──────────┘  └──────────┘  └──────────┘  └────────────────────────────┘    │
-│                                                                                │
-│  ┌─────────────────────────────────────────────────────────────────────────┐  │
-│  │                        DETECTION PIPELINE                                │  │
-│  │                                                                          │  │
-│  │  Input text chunks (paragraph/page, 2-sentence sliding overlap)         │  │
-│  │                                                                          │  │
-│  │  ┌───────────────┐  ┌───────────────┐  ┌──────────────┐  ┌──────────┐  │  │
-│  │  │   Presidio    │  │   scispaCy    │  │Custom Regex  │  │ Context  │  │  │
-│  │  │  Built-in     │  │  Medical NER  │  │  MRN/NPI     │  │  Boost   │  │  │
-│  │  │  Recognizers  │  │  BC5CDR model │  │  DEA/Ins.    │  │  Engine  │  │  │
-│  │  └───────────────┘  └───────────────┘  └──────────────┘  └──────────┘  │  │
-│  │                                ↓                                         │  │
-│  │                    Merge + deduplicate by span offset                    │  │
-│  │                    Document-level entity cache                           │  │
-│  │                                ↓                                         │  │
-│  │          confidence = 0.45×detector + 0.25×pattern                      │  │
-│  │                     + 0.20×context + 0.10×mistral                       │  │
-│  │                                ↓                                         │  │
-│  │         ┌─────────────────────────────────────────┐                     │  │
-│  │         │     Mistral AI Ambiguity Resolver        │                     │  │
-│  │         │  (only for spans scoring 0.40–0.75)     │                     │  │
-│  │         │  ±10 token context · JSON mode · No PHI │                     │  │
-│  │         │  Local template fallback if no API key  │                     │  │
-│  │         └─────────────────────────────────────────┘                     │  │
-│  └─────────────────────────────────────────────────────────────────────────┘  │
-│                                                                                │
-│  ┌─────────────────────────────────────────────────────────────────────────┐  │
-│  │                         REDACTION ENGINE                                 │  │
-│  │                                                                          │  │
-│  │  Mode filter → Allow/deny list per privacy mode                         │  │
-│  │                                                                          │  │
-│  │  PDF:   PyMuPDF add_redact_annot + apply_redactions + [REDACTED] text  │  │
-│  │  DOCX:  python-docx run-level replacement (preserves formatting)        │  │
-│  │  XLSX:  openpyxl cell value clear (formula cells untouched)             │  │
-│  │  Image: Pillow pixel overwrite (MediaPipe faces + pyzbar barcodes)      │  │
-│  │  DICOM: PS3.15 tag strip + pixel region overwrite                       │  │
-│  │  EML:   Header + body redaction + recursive attachment routing          │  │
-│  └─────────────────────────────────────────────────────────────────────────┘  │
-│                                                                                │
-│  ┌──────────────────────────┐   ┌─────────────────────────────────────────┐  │
-│  │       QA VERIFIER        │   │          OUTPUT GENERATOR               │  │
-│  │                          │   │                                         │  │
-│  │  Re-OCR redacted output  │   │  Confidence heatmap PNG (per-page)      │  │
-│  │  Re-run detection stack  │   │  Compliance report PDF                  │  │
-│  │  QA_FAILED → blocks DL   │   │  ZIP export (batch)                    │  │
-│  │  QA_PASSED → unlocks DL  │   │  Hash-chain audit entry                │  │
-│  └──────────────────────────┘   └─────────────────────────────────────────┘  │
-│                                                                                │
-└──────────────┬──────────────────────────────────────────┬─────────────────────┘
-               │                                          │
-               ▼                                          ▼
-┌─────────────────────────────┐            ┌─────────────────────────────────┐
-│    MongoDB Atlas M0 (Free)  │            │   Ephemeral Temp Storage        │
-│                             │            │   /tmp/medvault_jobs/{job_id}/  │
-│  Metadata only — NO files   │            │                                 │
-│  NO raw PHI values          │            │   Created: per job              │
-│                             │            │   Deleted: TTL 1hr or download  │
-│  collections:               │            │   Zero PHI survives a redeploy  │
-│  • users                    │            └─────────────────────────────────┘
-│  • documents                │
-│  • redaction_jobs           │            ┌─────────────────────────────────┐
-│  • redaction_entities       │            │   SMTP Email (optional)         │
-│  • audit_log (hash-chain)   │            │   Brevo / Gmail App Password    │
-│  • feedback                 │            │   For secure share notifications │
-│  • batch_jobs               │            └─────────────────────────────────┘
-│  • share_links              │
-└─────────────────────────────┘            ┌─────────────────────────────────┐
-                                           │   Web Push (VAPID, optional)    │
-                                           │   Job completion browser alerts  │
-                                           └─────────────────────────────────┘
+
+### Processing pipeline
+
+```mermaid
+flowchart LR
+    Input[Uploaded document] --> Extract[Format-aware extraction\nPDF · Office · images · DICOM · email]
+    Extract --> Chunks[Chunk text with overlap\nand retain page coordinates]
+    Chunks --> P[Presidio PII]
+    Chunks --> S[scispaCy medical NER]
+    Chunks --> R[Healthcare regex\nMRN · NPI · DEA · policy]
+    Chunks --> C[Context boost\nlabels and headers]
+    P & S & R & C --> Merge[Merge, deduplicate and cache\nentities across the document]
+    Merge --> Score[Composite confidence score]
+    Score --> Gate{Ambiguous\n0.40–0.75?}
+    Gate -->|Yes| AI[Mistral resolver\nminimal context only]
+    Gate -->|No| Filter
+    AI --> Filter[Privacy-mode rule filter]
+    Filter --> Redact[Format-aware destructive redaction]
+    Redact --> QA[Re-OCR and re-scan QA]
+    QA -->|Pass| Deliver[Output, heatmap, report\nand audit entry]
+    QA -->|Fail| Block[QA failed — export blocked]
+
+    classDef source fill:#123e54,stroke:#49dbd3,color:#fff;
+    classDef detector fill:#252052,stroke:#a581ff,color:#fff;
+    classDef gate fill:#4b3210,stroke:#ffc65a,color:#fff;
+    classDef output fill:#153a2e,stroke:#55d794,color:#fff;
+    class Input,Extract,Chunks source;
+    class P,S,R,C,Merge,Score,AI detector;
+    class Gate,Filter,QA gate;
+    class Redact,Deliver,Block output;
 ```
 
 ---
 
 ## Privacy Mode Architecture
 
-The privacy mode system is implemented as a set of **pure Python dataclasses** in `backend/app/redaction/mode_configs.py`. Adding a new mode requires only editing this one file — no pipeline logic changes.
+Privacy modes are pure Python dataclasses in `backend/app/redaction/mode_configs.py`. Adding a mode changes configuration, not pipeline logic.
 
-```
-Request: { document_id, privacy_mode: "research_sharing", custom_rules: null }
-          │
-          ▼
-ModeConfig = load_mode_config("research_sharing")
-  → confidence_threshold: 0.65
-  → entity_types_to_redact: [all 18 HIPAA Safe Harbor identifiers]
-  → entity_types_to_preserve: []
-  → synthetic_replacement: True
-  → privileged_tagging: False
-  → verbosity: "[REDACTED]"    (no entity type label in research mode)
-          │
-          ▼
-Detection pipeline runs with ModeConfig injected as context
-          │
-          ▼
-Mode filter: each detected entity checked against allow/deny list
-          │
-          ▼
-Redaction: entities passing filter are redacted
-Synthetic: for research_sharing, replaced with Faker values
-          │
-          ▼
-Risk scoring: k-anonymity check on surviving structured fields
-          │
-          ▼
-Output: { redacted_file, heatmap, report_pdf, risk_badge }
+```mermaid
+flowchart TB
+    Request[Redaction request\ndocument ID · mode · optional custom rules] --> Load[Load ModeConfig]
+    Load --> Config{Selected mode}
+    Config --> Portal[Patient Portal\nprotect external identifiers]
+    Config --> Research[Research Sharing\nSafe Harbor + synthetic replacement]
+    Config --> Insurance[Insurance\nclaim-oriented minimisation]
+    Config --> Legal[Legal Discovery\nprivilege-aware tagging]
+    Config --> Custom[Custom\nvalidated entity rules and thresholds]
+    Portal & Research & Insurance & Legal & Custom --> Context[Inject configuration into pipeline]
+    Context --> Detect[Detect and score entities]
+    Detect --> Filter[Allow/deny filter\nconfidence threshold]
+    Filter --> Transform[Mode-specific redaction\nor synthetic substitution]
+    Transform --> Risk[Risk scoring and QA]
+    Risk --> Result[Redacted file · heatmap\nreport PDF · risk badge]
+
+    classDef config fill:#17385a,stroke:#58c9ff,color:#fff;
+    classDef mode fill:#2d245a,stroke:#af8cff,color:#fff;
+    classDef result fill:#163a2d,stroke:#57db9b,color:#fff;
+    class Request,Load,Context,Detect,Filter,Transform,Risk config;
+    class Portal,Research,Insurance,Legal,Custom mode;
+    class Result result;
 ```
 
-### Mode Comparison Feature
+### Mode comparison feature
 
-The `POST /redaction/compare-modes` endpoint accepts `{document_id, modes: [...]}` and runs the pipeline for each mode independently. The result is a structured diff showing per-mode entity counts and a side-by-side preview of redacted output. This is implemented without storing intermediate files — each mode's redaction runs sequentially against the same extracted text cache.
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant F as Frontend
+    participant A as FastAPI
+    participant P as Redaction pipeline
+    U->>F: Choose document and two or more modes
+    F->>A: POST /redaction/compare-modes
+    loop Each selected mode
+        A->>P: Run from shared extracted-text cache
+        P-->>A: Output metadata, counts, preview reference
+    end
+    A-->>F: Per-mode diff and side-by-side outputs
+    F-->>U: Compare retained/redacted content and risk
+```
 
 ---
 
 ## Audit Trail Architecture
 
-The audit log is the trust anchor of the system. It is designed to be:
-- **Append-only** — no update or delete endpoints exist for the `audit_log` collection
-- **Hash-chained** — each entry includes the SHA-256 hash of the previous entry
-- **Verifiable** — the `/audit/verify/{document_id}` endpoint walks the chain and confirms integrity
+The audit trail is append-only, hash-chained, and verifiable without blockchain infrastructure.
 
+```mermaid
+flowchart LR
+    Genesis[Genesis hash\n000…000] --> E1[Audit entry N−1\naction metadata + timestamp]
+    E1 --> H1[SHA-256\nprevious hash + canonical entry]
+    H1 --> E2[Audit entry N\nprevious_hash = H1]
+    E2 --> H2[SHA-256\nprevious hash + canonical entry]
+    H2 --> DB[(Append-only\naudit_log collection)]
+    Verify[Verify endpoint] --> DB
+    DB --> Recompute[Walk entries in creation order\nand recompute each hash]
+    Recompute --> Integrity{Every hash\nmatches?}
+    Integrity -->|Yes| Valid[Integrity verified]
+    Integrity -->|No| Alert[Tampering or corruption reported]
+
+    classDef audit fill:#1f2d55,stroke:#80aaff,color:#fff;
+    classDef success fill:#143d2c,stroke:#5ce3a0,color:#fff;
+    classDef fail fill:#4b202a,stroke:#ff7385,color:#fff;
+    class Genesis,E1,H1,E2,H2,DB,Verify,Recompute audit;
+    class Valid success;
+    class Alert fail;
 ```
-Entry N-1:
-  entry_hash = sha256("0000...000" + entry_N-1_json)
-
-Entry N:
-  entry_hash = sha256(entry_N-1.entry_hash + entry_N_json)
-  previous_hash = entry_N-1.entry_hash
-
-Verify:
-  Walk all entries for document_id in creation order
-  Recompute each entry_hash from (previous_hash + entry_json)
-  Compare to stored entry_hash
-  Any mismatch → integrity failure reported
-```
-
-This approach does not require blockchain infrastructure — it is a self-verifying chain of MongoDB documents that proves the log was not retroactively edited.
 
 ---
 
 ## Confidence Scoring Architecture
 
-```
-Span: "John Alvarez" at position [45:57] in page 2
+```mermaid
+flowchart TB
+    Span[Candidate span\nPatient name at page position] --> L1[Presidio score\nweight 0.45]
+    Span --> L2[Pattern validation\nweight 0.25]
+    Span --> L3[Context labels\nweight 0.20]
+    Span --> L4[Mistral resolution\nweight 0.10 when needed]
+    L1 & L2 & L3 & L4 --> Formula[Composite confidence\n0.45 detector + 0.25 pattern\n+ 0.20 context + 0.10 AI]
+    Formula --> Threshold{Meets mode\nthreshold?}
+    Threshold -->|Yes| Auto[Auto-redact with a safe explanation]
+    Threshold -->|No| Review[Human-review queue or preserve]
 
-Layer 1 — Presidio score:        0.85  (PERSON entity, high confidence)
-Layer 2 — Pattern validation:    1.00  (name structure validated)
-Layer 3 — Context boost:         0.95  (preceded by "Patient:" label, 3 tokens prior)
-Layer 4 — Mistral score:         N/A   (span already above 0.75 threshold)
-
-Composite:
-  confidence = 0.45 × 0.85  +  0.25 × 1.00  +  0.20 × 0.95  +  0.10 × 0.0
-             = 0.3825        +  0.25         +  0.19          +  0.0
-             = 0.82
-
-Decision: confidence 0.82 >= threshold 0.75 → Auto-redact
-Explanation: "Redacted as PATIENT_NAME — appeared directly after a 'Patient:' label
-              and matched person-name structure (confidence 0.82)"
+    classDef score fill:#1d315a,stroke:#6fa6ff,color:#fff;
+    classDef decision fill:#4a3513,stroke:#f7c65f,color:#fff;
+    classDef pass fill:#153c2d,stroke:#59da99,color:#fff;
+    classDef hold fill:#4a202a,stroke:#ff8190,color:#fff;
+    class Span,L1,L2,L3,L4,Formula score;
+    class Threshold decision;
+    class Auto pass;
+    class Review hold;
 ```
 
 ---
 
 ## Data Flow — Single Document
 
-```
-User Browser                Backend                    Storage
-     │                         │                          │
-     │── POST /documents/upload ─►                        │
-     │                         │── create temp dir ──────►│
-     │◄─ { document_id } ──────│                          │
-     │                         │                          │
-     │── POST /redaction/run ──►│                          │
-     │◄─ { job_id } ───────────│                          │
-     │                         │                          │
-     │     (polling)           │── extract text ──────────►│
-     │── GET /redaction/status ─►── detect PHI            │
-     │◄─ { status: processing }│── score confidence       │
-     │                         │── resolve ambiguity (Mistral)
-     │── GET /redaction/status ─►── apply mode filter     │
-     │◄─ { status: processing }│── redact output file ────►│
-     │                         │── QA verify              │
-     │                         │── generate heatmap ──────►│
-     │                         │── write audit entry      │
-     │                         │── save job metadata ──►MongoDB
-     │                         │                          │
-     │── GET /redaction/status ─►                         │
-     │◄─ { status: complete }  │                          │
-     │                         │                          │
-     │── GET /redaction/download►── read redacted file ───►│
-     │◄─ [file bytes] ─────────│── delete temp dir ──────►│
-     │                         │                          │
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as User browser
+    participant A as FastAPI
+    participant T as Ephemeral storage
+    participant P as Processing pipeline
+    participant M as MongoDB metadata
+    U->>A: Upload file
+    A->>T: Create isolated per-job directory
+    A-->>U: Return document ID
+    U->>A: Start redaction with selected mode
+    A-->>U: Return job ID
+    A->>P: Queue processing
+    P->>T: Extract content and create working output
+    P->>P: Detect, score, resolve and redact
+    P->>P: Re-OCR and re-scan QA
+    P->>T: Write redacted artifact, heatmap and report
+    P->>M: Save safe metadata and hash-chain audit entry
+    loop While processing
+        U->>A: Poll job status
+        A-->>U: Queued or processing
+    end
+    U->>A: Read completed job
+    A-->>U: Preview metadata and completed status
+    U->>A: Download verified output
+    A->>T: Read output; retain for active session/TTL
+    A-->>U: Original file type with correct content disposition
 ```
 
 ---
 
 ## Deployment Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         PRODUCTION                              │
-│                                                                 │
-│  ┌───────────────────┐          ┌───────────────────────────┐  │
-│  │  Vercel           │          │  Render (Web Service)     │  │
-│  │  (Frontend)       │          │  (Backend)                │  │
-│  │                   │          │                           │  │
-│  │  React SPA        │◄────────►│  FastAPI + Uvicorn        │  │
-│  │  Static build     │  REST    │  Python 3.12              │  │
-│  │  CDN-distributed  │  HTTPS   │  Workers: 1-2 (CPU-bound) │  │
-│  │                   │          │  System: Tesseract, zbar  │  │
-│  └───────────────────┘          └──────────────┬────────────┘  │
-│                                                │               │
-│                                    ┌───────────▼────────────┐  │
-│                                    │  MongoDB Atlas (M0)    │  │
-│                                    │  512MB · Free forever  │  │
-│                                    │  External managed DB   │  │
-│                                    │  Not a Render add-on   │  │
-│                                    └────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    User([User]) --> CDN
+    subgraph Vercel[Vercel]
+        CDN[React static application\nCDN delivery]
+    end
+    CDN -->|HTTPS REST| Render
+    subgraph Render[Render web service]
+        API[FastAPI + Uvicorn\nPython 3.12]
+        Sys[Tesseract · Poppler\nzbar · OpenCV system tools]
+        Temp[/tmp/medvault_jobs\nephemeral working storage]
+        API --- Sys
+        API --> Temp
+    end
+    API --> Atlas[(MongoDB Atlas\nmetadata only)]
+    API -. optional .-> SMTP[Brevo / Gmail SMTP]
+    API -. optional .-> Push[VAPID web push]
 
-RENDER CONFIGURATION:
-  Root Directory: backend
-  Build Command:  pip install -r requirements.txt
-  Start Command:  uvicorn app.main:app --host 0.0.0.0 --port $PORT
-  apt.txt:        tesseract-ocr poppler-utils libgl1 libzbar0
-  TEMP_JOB_DIR:   /tmp/medvault_jobs  (ephemeral, per-request lifecycle)
-  WEB_CONCURRENCY: 1-2 (OCR/CV workloads are CPU-heavy)
+    classDef cloud fill:#18385a,stroke:#65b7ff,color:#fff;
+    classDef compute fill:#2b2456,stroke:#b195ff,color:#fff;
+    classDef storage fill:#163c2d,stroke:#59d997,color:#fff;
+    class CDN,Vercel cloud;
+    class API,Sys,Render compute;
+    class Temp,Atlas,SMTP,Push storage;
 ```
+
+**Render configuration**
+
+| Setting | Value |
+|---|---|
+| Root directory | `backend` |
+| Build command | `pip install -r requirements.txt` |
+| Start command | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
+| Required system packages | `tesseract-ocr`, `poppler-utils`, `libgl1`, `libzbar0` |
+| Temporary job directory | `/tmp/medvault_jobs` |
+| Web concurrency | 1–2 workers for CPU-heavy OCR/CV workloads |
 
 ---
 
@@ -283,11 +268,11 @@ RENDER CONFIGURATION:
 | **Audit tampering** | SHA-256 hash chain; append-only collection; no update/delete routes exposed |
 | **Redaction bypass** | QA loop re-OCRs and re-scans output; blocks download on failure |
 | **Overlay attack** | PyMuPDF `apply_redactions()` is destructive — no text layer survives under visual boxes |
-| **AI data leakage** | Mistral receives only ±10 token context window, never full documents |
+| **AI data leakage** | Mistral receives only a minimal context window, never full documents |
 | **Share link abuse** | Password protection, per-link expiry, per-link download caps, revocation |
 | **Authentication** | JWT with Argon2-hashed passwords; no SMS/phone number collected |
 | **CORS** | Explicit origin allowlist; credentials blocked for wildcard origins |
-| **Upload safety** | File size limit (50MB); file type validation; per-job isolation |
+| **Upload safety** | File size limit, file type validation, and per-job isolation |
 
 ---
 
@@ -298,9 +283,9 @@ RENDER CONFIGURATION:
 | **Microsoft Presidio** | Hand-rolled spaCy regex | Purpose-built PII framework; higher out-of-box accuracy; MIT licensed; pluggable |
 | **scispaCy** | Generic spaCy | Trained on biomedical text; catches clinical entities that generic NER misses |
 | **MongoDB** | PostgreSQL | Document-oriented fits variable-length entity arrays; no migration overhead for schema evolution |
-| **Destructive PyMuPDF redaction** | Black-box overlay | Prevents copy-paste recovery of "redacted" content — the most common real-world failure mode |
-| **Process-and-discard storage** | Object storage (S3, R2) | Zero PHI at rest; no storage cost; no Render paid disk add-on needed |
-| **Mistral AI** | OpenAI GPT | User's explicit preference; comparable capability; competitive pricing |
-| **VAPID Web Push** | Twilio SMS | Free, no third-party account required, no phone number collection |
-| **Beanie ODM** | pymongo raw | Pydantic-native; auto-validates on insert; reuses FastAPI's Pydantic schema |
-| **BackgroundTasks** | Celery + Redis | No additional infrastructure on free-tier deploy; clear upgrade path exists |
+| **Destructive PyMuPDF redaction** | Black-box overlay | Prevents copy-paste recovery of redacted content |
+| **Process-and-discard storage** | Object storage | Zero PHI at rest and no persistent file storage cost |
+| **Mistral AI** | Generic LLM fallback | Supports ambiguity resolution with constrained context |
+| **VAPID Web Push** | SMS | Browser-native and avoids phone-number collection |
+| **Beanie ODM** | Raw pymongo | Pydantic-native validation integrated with FastAPI schemas |
+| **BackgroundTasks** | Celery + Redis | No additional infrastructure on the starter deployment tier |

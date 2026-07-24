@@ -5,7 +5,7 @@
 ![MedVault — Healthcare Document Privacy Pipeline](docs/title_banner.png)
 
 -->
-<img src="docs/title_banner.png" alt="MedVault healthcare document privacy pipeline" width="860" />
+<img src="docs/medvault-hero.svg" alt="MedVault healthcare document privacy pipeline" width="100%" />
 
 <br/>
 

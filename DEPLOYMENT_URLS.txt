@@ -1,0 +1,8 @@
+MedVault Production Deployment URLs
+===================================
+
+Frontend (Vercel)
+https://medvault-healthcare-document-privac.vercel.app/
+
+Backend API (Render)
+https://medvault-healthcare-document-privacy.onrender.com/

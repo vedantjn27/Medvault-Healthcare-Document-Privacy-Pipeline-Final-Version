@@ -33,6 +33,13 @@ npm run dev
 | `VITE_API_BASE_URL` | Backend origin. `/api/v1` is appended automatically. Defaults to `http://localhost:8000`. |
 | `VITE_VAPID_PUBLIC_KEY` | Public VAPID key used to subscribe to Web Push. Must match backend. |
 
+### Environment-specific API origins
+
+- `frontend/.env` is used by `npm run dev` and points to the local backend: `http://127.0.0.1:8000`.
+- `frontend/.env.production` is used by `npm run build` and points to the deployed Render backend: `https://medvault-healthcare-document-privacy.onrender.com`.
+
+Vite embeds `VITE_*` values at build time. Rebuild/redeploy the frontend after changing a production value. Configure `VITE_VAPID_PUBLIC_KEY` in the deployment provider's production environment variables when browser push is enabled.
+
 ## Scripts
 
 ```bash

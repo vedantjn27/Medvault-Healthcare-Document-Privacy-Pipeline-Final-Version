@@ -356,11 +356,12 @@ See `MANUAL_TESTING_GUIDE.md` for the full end-to-end test checklist.
 
 1. Create a **New Web Service** on [https://render.com](https://render.com)
 2. Connect your repository
-3. **Build Command:** `pip install -r requirements.txt`
-4. **Start Command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-5. **Root Directory:** `backend`
-6. Add all environment variables from Section 14 to the Render **Environment** tab
-7. Set `FRONTEND_PUBLIC_URL` to your actual Vercel/frontend domain
+3. Set **Language** to **Docker**
+4. Set **Root Directory** to `backend`
+5. Set **Dockerfile Path** to `Dockerfile` (relative to that root directory)
+6. Leave Render's native **Build Command** and **Start Command** fields empty; the Dockerfile owns both steps
+7. Add all environment variables from Section 14 to the Render **Environment** tab
+8. Set `FRONTEND_PUBLIC_URL` to your actual Vercel/frontend domain
 
 > **Important:** Render's free tier has a request timeout. Ensure `TEMP_JOB_DIR` is set to `/tmp/medvault_jobs` since Render's ephemeral filesystem is acceptable for process-and-discard files.
 
@@ -373,7 +374,7 @@ See `MANUAL_TESTING_GUIDE.md` for the full end-to-end test checklist.
 
 ### System Dependencies on Render
 
-Render supports `apt.txt` for system package installation. The `backend/apt.txt` already contains:
+Render's native Python runtime does not install packages from `apt.txt`. Deploy the backend as a Docker web service using `backend/Dockerfile`; it installs the required system packages:
 ```
 tesseract-ocr
 poppler-utils

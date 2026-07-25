@@ -1,1 +1,4 @@
-# System packages are pinned during the deployment phase.
+# Render's native Python runtime does not consume apt.txt.
+# The Dockerfile is the authoritative production package definition.
+# It installs: tesseract-ocr, poppler-utils, libzbar0, libgl1,
+# libglib2.0-0, and libgomp1.

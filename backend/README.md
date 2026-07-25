@@ -1,5 +1,7 @@
 # MedVault Backend
 
+> **Render runtime:** deploy this backend with Python **3.12.5**. The committed `.python-version` file selects it automatically when `backend` is the Render service root. If your service already has a `PYTHON_VERSION` environment variable, set it to `3.12.5` or remove it so the file can take effect.
+
 MedVault is a FastAPI backend for detecting and destructively redacting PHI/PII from healthcare documents. Uploaded and generated files use short-lived local working directories; file bytes are never persisted in MongoDB.
 
 ## Current status

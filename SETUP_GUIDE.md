@@ -363,6 +363,16 @@ See `MANUAL_TESTING_GUIDE.md` for the full end-to-end test checklist.
 7. Add all environment variables from Section 14 to the Render **Environment** tab
 8. Set `FRONTEND_PUBLIC_URL` to your actual Vercel/frontend domain
 
+### Render Free resource profile
+
+For a 512 MB Render Free instance, additionally set:
+
+```env
+RESOURCE_PROFILE=free
+```
+
+This opt-in profile is deployment-only: it selects the smaller spaCy model, 200-DPI scanned-PDF OCR, one detection chunk at a time, a 10 MB per-file limit, and a three-file batch limit. Do **not** set it in `backend/.env` when running locally; local development remains on the full profile.
+
 > **Important:** Render's free tier has a request timeout. Ensure `TEMP_JOB_DIR` is set to `/tmp/medvault_jobs` since Render's ephemeral filesystem is acceptable for process-and-discard files.
 
 ### Frontend on Vercel

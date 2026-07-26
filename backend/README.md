@@ -4,6 +4,8 @@
 
 > **Render system dependencies:** deploy as a **Docker** web service using `backend/Dockerfile`. MedVault requires native OCR, PDF, barcode, and OpenCV libraries; Render's native Python runtime does not install packages listed in `apt.txt`.
 
+> **Render Free profile:** set `RESOURCE_PROFILE=free` only on a 512 MB Render Free service. It uses `en_core_web_sm`, 200-DPI scanned-PDF OCR, one detection chunk at a time, a 10 MB per-file upload cap, and a three-file batch cap. Local development remains `RESOURCE_PROFILE=full` by default.
+
 MedVault is a FastAPI backend for detecting and destructively redacting PHI/PII from healthcare documents. Uploaded and generated files use short-lived local working directories; file bytes are never persisted in MongoDB.
 
 ## Current status

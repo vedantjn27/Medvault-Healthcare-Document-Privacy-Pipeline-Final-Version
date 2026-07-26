@@ -6,11 +6,9 @@ import threading
 import warnings
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
-import mediapipe as mp
 import numpy as np
-from mediapipe.tasks.python import vision
-from mediapipe.tasks.python.core.base_options import BaseOptions
 from PIL import Image, ImageSequence
 import pytesseract
 from pytesseract import Output
@@ -29,7 +27,12 @@ class ImageExtractionError(ValueError):
 
 
 @lru_cache(maxsize=1)
-def get_face_detector() -> vision.FaceDetector:
+def get_face_detector() -> Any:
+    """Load MediaPipe only for image/DICOM work, not every text-document request."""
+
+    from mediapipe.tasks.python import vision
+    from mediapipe.tasks.python.core.base_options import BaseOptions
+
     if not FACE_MODEL_PATH.is_file():
         raise ImageExtractionError("Local MediaPipe face detector model is missing")
     options = vision.FaceDetectorOptions(
@@ -42,6 +45,8 @@ def get_face_detector() -> vision.FaceDetector:
 
 
 def detect_faces(image: Image.Image) -> list[tuple[float, float, float, float]]:
+    import mediapipe as mp
+
     rgb = np.ascontiguousarray(image.convert("RGB"), dtype=np.uint8)
     media_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
     with _FACE_LOCK:

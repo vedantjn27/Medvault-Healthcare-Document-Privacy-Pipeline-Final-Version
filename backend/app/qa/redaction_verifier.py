@@ -43,7 +43,8 @@ class RedactionVerifier:
     ) -> VerificationResult:
         extracted = await asyncio.to_thread(_extract_output, output, file_type, settings)
         detector = self._detector or DetectionPipeline(
-            max_concurrent_chunks=settings.max_concurrent_chunks
+            max_concurrent_chunks=settings.effective_max_concurrent_chunks,
+            spacy_model=settings.effective_spacy_model,
         )
         candidates = await detector.analyze_document(
             extracted.text,
@@ -78,7 +79,11 @@ def _is_residual(candidate: DetectionCandidate, allowed: set[str], file_type: st
 
 def _extract_output(path: Path, file_type: str, settings: Settings):
     if file_type == "pdf":
-        return extract_pdf(path, tesseract_cmd=settings.tesseract_cmd)
+        return extract_pdf(
+            path,
+            tesseract_cmd=settings.tesseract_cmd,
+            ocr_dpi=settings.effective_ocr_dpi,
+        )
     if file_type == "docx":
         return extract_docx(path, tesseract_cmd=settings.tesseract_cmd)
     if file_type == "xlsx":
@@ -88,5 +93,10 @@ def _extract_output(path: Path, file_type: str, settings: Settings):
     if file_type == "dicom":
         return extract_dicom(path, tesseract_cmd=settings.tesseract_cmd)
     if file_type in {"eml", "mbox"}:
-        return extract_email(path, file_type=FileType(file_type), tesseract_cmd=settings.tesseract_cmd)
+        return extract_email(
+            path,
+            file_type=FileType(file_type),
+            tesseract_cmd=settings.tesseract_cmd,
+            ocr_dpi=settings.effective_ocr_dpi,
+        )
     raise ValueError("Unsupported QA file type")

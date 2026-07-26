@@ -57,7 +57,38 @@ class Settings(BaseSettings):
     max_upload_size_bytes: int = Field(default=52_428_800, ge=1_048_576)
     max_batch_files: int = Field(default=25, ge=1, le=100)
     max_concurrent_chunks: int = Field(default=4, ge=1, le=32)
+    resource_profile: Literal["full", "free"] = "full"
     tesseract_cmd: Path | None = None
+
+    @property
+    def effective_spacy_model(self) -> str:
+        """Select a model without changing the local full-fidelity default."""
+
+        return "en_core_web_sm" if self.resource_profile == "free" else "en_core_web_lg"
+
+    @property
+    def effective_ocr_dpi(self) -> int:
+        """Constrain raster memory only for the explicitly enabled free profile."""
+
+        return 200 if self.resource_profile == "free" else 300
+
+    @property
+    def effective_max_concurrent_chunks(self) -> int:
+        """Free Render instances process one chunk at a time to cap peak memory."""
+
+        return 1 if self.resource_profile == "free" else self.max_concurrent_chunks
+
+    @property
+    def effective_max_upload_size_bytes(self) -> int:
+        """Avoid accepting files a 512 MB service cannot safely process."""
+
+        return min(self.max_upload_size_bytes, 10 * 1024 * 1024) if self.resource_profile == "free" else self.max_upload_size_bytes
+
+    @property
+    def effective_max_batch_files(self) -> int:
+        """Keep free-tier batch work bounded without changing local limits."""
+
+        return min(self.max_batch_files, 3) if self.resource_profile == "free" else self.max_batch_files
 
     @field_validator("api_v1_prefix")
     @classmethod

@@ -100,8 +100,8 @@ async def upload_batch(
         )
         if existing is not None:
             return _response(existing)
-    if not files or len(files) > settings.max_batch_files:
-        raise HTTPException(422, f"Batch must contain 1 to {settings.max_batch_files} files")
+    if not files or len(files) > settings.effective_max_batch_files:
+        raise HTTPException(422, f"Batch must contain 1 to {settings.effective_max_batch_files} files")
     if privacy_mode == PrivacyMode.CUSTOM:
         raise HTTPException(422, "Custom mode is not supported for batch processing")
     items: list[BatchItem] = []
@@ -110,7 +110,9 @@ async def upload_batch(
         directory = create_document_directory(settings.temp_job_dir, str(document_id))
         safe_name = sanitize_filename(upload.filename)
         try:
-            stored = await store_upload(upload, directory / safe_name, settings.max_upload_size_bytes)
+            stored = await store_upload(
+                upload, directory / safe_name, settings.effective_max_upload_size_bytes
+            )
             file_type = await asyncio.to_thread(classify_document, stored.path, safe_name)
             now = utc_now()
             document = UploadedDocument(

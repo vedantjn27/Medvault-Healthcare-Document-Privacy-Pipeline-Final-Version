@@ -11,12 +11,14 @@ from app.detection.medical_recognizers import HealthcareIdentifierRecognizer
 from app.detection.scispacy_recognizer import SciSpacyRecognizer
 
 
-def build_analyzer(*, include_scispacy: bool = True) -> AnalyzerEngine:
+def build_analyzer(
+    *, model_name: str = "en_core_web_lg", include_scispacy: bool = True
+) -> AnalyzerEngine:
     """Build a fully local English analyzer using the installed CPU models."""
 
     configuration = {
         "nlp_engine_name": "spacy",
-        "models": [{"lang_code": "en", "model_name": "en_core_web_lg"}],
+        "models": [{"lang_code": "en", "model_name": model_name}],
     }
     nlp_engine = NlpEngineProvider(nlp_configuration=configuration).create_engine()
     registry = RecognizerRegistry(supported_languages=["en"])
@@ -32,8 +34,8 @@ def build_analyzer(*, include_scispacy: bool = True) -> AnalyzerEngine:
     )
 
 
-@lru_cache(maxsize=1)
-def get_analyzer() -> AnalyzerEngine:
+@lru_cache(maxsize=2)
+def get_analyzer(model_name: str = "en_core_web_lg") -> AnalyzerEngine:
     """Load the general PII and custom-regex analyzer once per worker process."""
 
-    return build_analyzer(include_scispacy=False)
+    return build_analyzer(model_name=model_name, include_scispacy=False)

@@ -163,11 +163,12 @@ class DetectionPipeline:
         *,
         max_concurrent_chunks: int = 4,
         chunk_characters: int = DEFAULT_CHUNK_CHARACTERS,
+        spacy_model: str = "en_core_web_lg",
     ) -> None:
         if not 1 <= max_concurrent_chunks <= 32:
             raise ValueError("max_concurrent_chunks must be between 1 and 32")
         using_default_ensemble = analyzer is None
-        self.analyzer = analyzer or get_analyzer()
+        self.analyzer = analyzer or get_analyzer(spacy_model)
         self.scispacy_recognizer = (
             scispacy_recognizer
             if scispacy_recognizer is not None

@@ -111,7 +111,7 @@ async def upload_document(
     directory = create_document_directory(settings.temp_job_dir, str(document_id))
     destination = directory / safe_name
     try:
-        stored = await store_upload(file, destination, settings.max_upload_size_bytes)
+        stored = await store_upload(file, destination, settings.effective_max_upload_size_bytes)
         file_type = await asyncio.to_thread(classify_document, stored.path, safe_name)
         now = utc_now()
         document = UploadedDocument(

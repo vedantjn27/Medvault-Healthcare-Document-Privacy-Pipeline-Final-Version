@@ -40,9 +40,11 @@ class AttachmentExtraction:
     extracted: ExtractedDocument
 
 
-def _extract_by_type(path: Path, file_type: FileType, tesseract_cmd, depth: int) -> ExtractedDocument:
+def _extract_by_type(
+    path: Path, file_type: FileType, tesseract_cmd, depth: int, ocr_dpi: int
+) -> ExtractedDocument:
     if file_type == FileType.PDF:
-        return extract_pdf(path, tesseract_cmd=tesseract_cmd)
+        return extract_pdf(path, tesseract_cmd=tesseract_cmd, ocr_dpi=ocr_dpi)
     if file_type == FileType.DOCX:
         return extract_docx(path, tesseract_cmd=tesseract_cmd)
     if file_type == FileType.XLSX:
@@ -52,7 +54,13 @@ def _extract_by_type(path: Path, file_type: FileType, tesseract_cmd, depth: int)
     if file_type == FileType.DICOM:
         return extract_dicom(path, tesseract_cmd=tesseract_cmd)
     if file_type in {FileType.EML, FileType.MBOX}:
-        return extract_email(path, file_type=file_type, tesseract_cmd=tesseract_cmd, depth=depth + 1)
+        return extract_email(
+            path,
+            file_type=file_type,
+            tesseract_cmd=tesseract_cmd,
+            depth=depth + 1,
+            ocr_dpi=ocr_dpi,
+        )
     raise EmailExtractionError("Unsupported recursive attachment format")
 
 
@@ -107,6 +115,7 @@ def _extract_message(
     parent: Path,
     tesseract_cmd,
     depth: int,
+    ocr_dpi: int,
     parts: list[str],
     tokens: list[LayoutToken],
     contexts: list[StructuralContext],
@@ -142,7 +151,9 @@ def _extract_message(
                     temporary.write(payload)
                     temporary_path = Path(temporary.name)
                 file_type = classify_document(temporary_path, safe_name)
-                extracted = _extract_by_type(temporary_path, file_type, tesseract_cmd, depth)
+                extracted = _extract_by_type(
+                    temporary_path, file_type, tesseract_cmd, depth, ocr_dpi
+                )
             except InvalidDocumentError as exc:
                 raise EmailExtractionError(f"Unsupported attachment format: {safe_name}") from exc
             finally:
@@ -181,6 +192,7 @@ def extract_email(
     file_type: FileType,
     tesseract_cmd: Path | None = None,
     depth: int = 0,
+    ocr_dpi: int = 300,
 ) -> ExtractedDocument:
     parts: list[str] = []
     tokens: list[LayoutToken] = []
@@ -201,7 +213,7 @@ def extract_email(
             raise EmailExtractionError("Expected EML or MBOX input")
         for index, message in enumerate(messages):
             _extract_message(
-                message, index, path.parent, tesseract_cmd, depth,
+                message, index, path.parent, tesseract_cmd, depth, ocr_dpi,
                 parts, tokens, contexts, forced, attachments,
             )
     except EmailExtractionError:

@@ -61,7 +61,11 @@ def output_path_for(document: UploadedDocument, job_id: PydanticObjectId) -> Pat
 def _extract(document: UploadedDocument, settings: Settings) -> ExtractedDocument:
     source = Path(document.temp_job_path)
     if document.file_type == "pdf":
-        return extract_pdf(source, tesseract_cmd=settings.tesseract_cmd)
+        return extract_pdf(
+            source,
+            tesseract_cmd=settings.tesseract_cmd,
+            ocr_dpi=settings.effective_ocr_dpi,
+        )
     if document.file_type == "docx":
         return extract_docx(source, tesseract_cmd=settings.tesseract_cmd)
     if document.file_type == "xlsx":
@@ -75,6 +79,7 @@ def _extract(document: UploadedDocument, settings: Settings) -> ExtractedDocumen
             source,
             file_type=FileType(document.file_type),
             tesseract_cmd=settings.tesseract_cmd,
+            ocr_dpi=settings.effective_ocr_dpi,
         )
     raise RedactionPipelineError("This file type is not enabled in the current pipeline phase")
 
@@ -180,7 +185,8 @@ async def process_redaction_job(
         custom_rules = CustomRules.model_validate(job.custom_rules) if job.custom_rules else None
         mode = get_mode_config(job.privacy_mode, custom_rules)
         detection_pipeline = detector or DetectionPipeline(
-            max_concurrent_chunks=settings.max_concurrent_chunks
+            max_concurrent_chunks=settings.effective_max_concurrent_chunks,
+            spacy_model=settings.effective_spacy_model,
         )
         candidates = await detection_pipeline.analyze_document(
             extracted.text,

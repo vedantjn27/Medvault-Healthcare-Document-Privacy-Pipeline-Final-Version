@@ -117,8 +117,10 @@ def _ocr_page(
     parts: list[str],
     tokens: list[LayoutToken],
     page_number: int,
+    *,
+    dpi: int = 300,
 ) -> None:
-    scale = 300.0 / 72.0
+    scale = float(dpi) / 72.0
     pixmap = fitz_page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
     image = Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples)
     data = pytesseract.image_to_data(image, config="--psm 6", output_type=Output.DICT)
@@ -153,7 +155,9 @@ def _ocr_page(
         )
 
 
-def extract_pdf(path: Path, *, tesseract_cmd: Path | None = None) -> ExtractedDocument:
+def extract_pdf(
+    path: Path, *, tesseract_cmd: Path | None = None, ocr_dpi: int = 300
+) -> ExtractedDocument:
     if tesseract_cmd is not None:
         pytesseract.pytesseract.tesseract_cmd = str(tesseract_cmd)
     parts: list[str] = []
@@ -172,7 +176,13 @@ def extract_pdf(path: Path, *, tesseract_cmd: Path | None = None) -> ExtractedDo
                     parts.append("\n\n")
                 count = _native_page(plumber_page, parts, tokens, page_index + 1)
                 if count < 20:
-                    _ocr_page(fitz_document.load_page(page_index), parts, tokens, page_index + 1)
+                    _ocr_page(
+                        fitz_document.load_page(page_index),
+                        parts,
+                        tokens,
+                        page_index + 1,
+                        dpi=ocr_dpi,
+                    )
                     scanned_pages.append(page_index + 1)
         page_count = fitz_document.page_count
         fitz_document.close()
